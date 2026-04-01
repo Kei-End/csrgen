@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ECC CSR Generator & Compatibility Checker</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #dbe3ee;
+      --primary: #0f766e;
+      --primary-dark: #115e59;
+      --warning-bg: #fff7ed;
+      --warning-line: #ea580c;
+      --ok-bg: #ecfdf5;
+      --ok-line: #16a34a;
+      --info-bg: #eff6ff;
+      --info-line: #2563eb;
+      --soft: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
+    }
+
+    .wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      margin: 0 0 24px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .section-title {
+      margin: 24px 0 12px 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: 2px solid rgba(15, 118, 110, 0.15);
+      border-color: var(--primary);
+    }
+
+    .hint {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button.secondary:hover {
+      background: #334155;
+    }
+
+    textarea {
+      min-height: 260px;
+      resize: vertical;
+      font-family: Consolas, "Courier New", monospace;
+      white-space: pre-wrap;
+    }
+
+    .panel {
+      margin-top: 16px;
+      border-radius: 12px;
+      padding: 14px 16px;
+      border-left: 6px solid;
+    }
+
+    .panel.warning {
+      background: var(--warning-bg);
+      border-left-color: var(--warning-line);
+    }
+
+    .panel.ok {
+      background: var(--ok-bg);
+      border-left-color: var(--ok-line);
+    }
+
+    .panel.info {
+      background: var(--info-bg);
+      border-left-color: var(--info-line);
+    }
+
+    .panel strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .panel ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .mini-table th,
+    .mini-table td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .mini-table th {
+      background: var(--soft);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge.good {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge.warn {
+      background: #ffedd5;
+      color: #9a3412;
+    }
+
+    .badge.unknown {
+      background: #e2e8f0;
+      color: #334155;
+    }
+
+    .footer-note {
+      margin-top: 20px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 800px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .card {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+      .actions {
+        display: none;
+      }
+      textarea {
+        min-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <h1>ECC CSR Generator & Compatibility Checker</h1>
+      <p class="subtitle">
+        This tool prepares CSR guidance for SSL/TLS using ECC P-384 and checks known compatibility issues found during previous implementation cases.
+      </p>
+
+      <div class="section-title">1. Certificate Request Details</div>
+      <div class="grid">
+        <div class="field">
+          <label for="cn">Common Name (CN)</label>
+          <input id="cn" type="text" placeholder="example.gov.my">
+          <div class="hint">FQDN of the server or website.</div>
+        </div>
+
+        <div class="field">
+          <label for="san">Subject Alternative Names (SAN)</label>
+          <input id="san" type="text" placeholder="www.example.gov.my, portal.example.gov.my">
+          <div class="hint">Separate multiple SAN values with commas.</div>
+        </div>
+
+        <div class="field">
+          <label for="org">Organisation (O)</label>
+          <input id="org" type="text" placeholder="Agency Name">
+        </div>
+
+        <div class="field">
+          <label for="ou">Organisational Unit (OU)</label>
+          <input id="ou" type="text" placeholder="ICT Division">
+        </div>
+
+        <div class="field">
+          <label for="city">City / Locality (L)</label>
+          <input id="city" type="text" placeholder="Putrajaya">
+        </div>
+
+        <div class="field">
+          <label for="state">State (ST)</label>
+          <input id="state" type="text" placeholder="Wilayah Persekutuan Putrajaya">
+        </div>
+
+        <div class="field">
+          <label for="country">Country (C)</label>
+          <input id="country" type="text" maxlength="2" placeholder="MY">
+        </div>
+
+        <div class="field">
+          <label for="email">Contact Email (optional)</label>
+          <input id="email" type="text" placeholder="admin@example.gov.my">
+        </div>
+      </div>
+
+      <div class="section-title">2. Platform & Web Stack</div>
+      <div class="grid">
+        <div class="field">
+          <label for="platform">Platform</label>
+          <select id="platform" onchange="togglePlatformNote()">
+            <option value="Linux">Linux</option>
+            <option value="Windows">Windows</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="webserver">Web Server / Stack</label>
+          <select id="webserver">
+            <option value="Apache">Apache</option>
+            <option value="Nginx">Nginx</option>
+            <option value="IIS">IIS</option>
+            <option value="XAMPP">XAMPP</option>
+            <option value="Tomcat">Tomcat</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="osVersion">OS Version</label>
+          <input id="osVersion" type="text" placeholder="Windows Server 2016 / CentOS 7 / Ubuntu 22.04">
+          <div class="hint">Examples: Windows Server 2012, CentOS 7, Rocky Linux 8.</div>
+        </div>
+
+        <div class="field">
+          <label for="opensslVersion">OpenSSL Version</label>
+          <input id="opensslVersion" type="text" placeholder="1.1.1 / 3.0.2">
+        </div>
+
+        <div class="field">
+          <label for="opensshVersion">OpenSSH Version</label>
+          <input id="opensshVersion" type="text" placeholder="8.0 / 9.3">
+        </div>
+
+        <div class="field">
+          <label for="apacheVersion">Apache Version</label>
+          <input id="apacheVersion" type="text" placeholder="2.4.54">
+        </div>
+
+        <div class="field">
+          <label for="phpVersion">PHP Version</label>
+          <input id="phpVersion" type="text" placeholder="7.4.33">
+        </div>
+
+        <div class="field">
+          <label for="xamppVersion">XAMPP Version</label>
+          <input id="xamppVersion" type="text" placeholder="7.4.33">
+        </div>
+      </div>
+
+      <div id="platformNote" class="panel info">
+        <strong>Linux guidance</strong>
+        For Linux, this tool generates an OpenSSL command using ECC P-384 with SHA-256. Private key stays on the host under agency control.
+      </div>
+
+      <div class="section-title">3. Generate</div>
+      <div class="actions">
+        <button type="button" onclick="generateResult()">Generate Script & Check Issues</button>
+        <button type="button" class="secondary" onclick="copyOutput()">Copy Output</button>
+        <button type="button" class="secondary" onclick="window.print()">Print</button>
+        <button type="button" class="secondary" onclick="resetForm()">Reset</button>
+      </div>
+
+      <div class="section-title">4. Output</div>
+      <div class="field full">
+        <label for="output">Generated Script / Guidance</label>
+        <textarea id="output" readonly></textarea>
+      </div>
+
+      <div id="resultArea"></div>
+
+      <div class="section-title">5. Minimum Baseline Reference</div>
+      <table class="mini-table">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Minimum Baseline</th>
+            <th>Reason for Concern</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OpenSSL</td>
+            <td>1.1.1 and above</td>
+            <td>Older cryptographic libraries may fail or behave inconsistently with ECC CSR generation.</td>
+          </tr>
+          <tr>
+            <td>OpenSSH</td>
+            <td>1.1.1 and above</td>
+            <td>Used here as part of the current knowledge bank rule set supplied for your environment.</td>
+          </tr>
+          <tr>
+            <td>Windows Server</td>
+            <td>2012 and above</td>
+            <td>Older Windows crypto stack may not support ECC workflows cleanly.</td>
+          </tr>
+          <tr>
+            <td>Linux OS</td>
+            <td>CentOS 7 and above</td>
+            <td>Older builds often come with outdated libraries or unsupported defaults.</td>
+          </tr>
+          <tr>
+            <td>XAMPP</td>
+            <td>7.4.33 and above</td>
+            <td>Bundled components may be too old for stable ECC handling.</td>
+          </tr>
+          <tr>
+            <td>Apache</td>
+            <td>2.4.54 and above</td>
+            <td>Older server builds may cause TLS or ECC handling issues.</td>
+          </tr>
+          <tr>
+            <td>PHP</td>
+            <td>7.4.33 and above</td>
+            <td>Older versions may indicate an outdated overall stack.</td>
+          </tr>
+          <tr>
+            <td>CSR handling</td>
+            <td>Original file only</td>
+            <td>Do not copy-paste CSR through UI, email, PDF, or WhatsApp. Formatting damage can corrupt the request.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="footer-note">
+        ECC target: 384-bit EC curve (secp384r1 / P-384). Hash: SHA-256.  
+        This tool is intended as a preventive check before SSL/TLS application submission.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function versionCompare(v1, v2) {
+      if (!v1 || !v2) return null;
+
+      const a = String(v1).match(/\d+/g);
+      const b = String(v2).match(/\d+/g);
+
+      if (!a || !b) return null;
+
+      const len = Math.max(a.length, b.length);
+      for (let i = 0; i < len; i++) {
+        const n1 = parseInt(a[i] || "0", 10);
+        const n2 = parseInt(b[i] || "0", 10);
+
+        if (n1 > n2) return 1;
+        if (n1 < n2) return -1;
+      }
+      return 0;
+    }
+
+    function extractWindowsYear(text) {
+      const match = String(text || "").match(/(2003|2008|2012|2016|2019|2022|2025)/);
+      return match ? parseInt(match[1], 10) : null;
+    }
+
+    function extractCentOSMajor(text) {
+      const match = String(text || "").match(/centos\s*(\d+)/i);
+      return match ? parseInt(match[1], 10) : null;
+    }
+
+    function safe(value) {
+      return String(value || "").replace(/"/g, '\\"').trim();
+    }
+
+    function normaliseFileName(name) {
+      const clean = String(name || "server")
+        .trim()
+        .replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      return clean || "server";
+    }
+
+    function buildOpenSSLConfig(data) {
+      const hasSAN = data.sanList.length > 0;
+      return `
+# Save as openssl-${data.fileBase}.cnf
+
+[ req ]
+default_bits       = 384
+prompt             = no
+default_md         = sha256
+req_extensions     = req_ext
+distinguished_name = dn
+
+[ dn ]
+C  = ${data.country}
+ST = ${data.state}
+L  = ${data.city}
+O  = ${data.org}
+OU = ${data.ou}
+CN = ${data.cn}
+${data.email ? `emailAddress = ${data.email}` : ""}
+
+[ req_ext ]
+${hasSAN ? "subjectAltName = @alt_names" : "# No SAN provided"}
+
+${hasSAN ? `[ alt_names ]
+${data.sanList.map((san, index) => `DNS.${index + 1} = ${san}`).join("\n")}` : ""}
+`.trim();
+    }
+
+    function generateLinuxScript(data) {
+      const hasSAN = data.sanList.length > 0;
+      const configName = `openssl-${data.fileBase}.cnf`;
+
+      if (hasSAN) {
+        return `# ECC CSR generation for Linux
+# Curve: secp384r1 (P-384)
+# Hash: SHA-256
+# Output files:
+#   - ${data.fileBase}.key
+#   - ${data.fileBase}.csr
+#   - ${configName}
+
+# 1. Create OpenSSL config file with SAN
+cat > ${configName} <<'EOF'
+${buildOpenSSLConfig(data)}
+EOF
+
+# 2. Generate ECC private key
+openssl ecparam -name secp384r1 -genkey -noout -out ${data.fileBase}.key
+
+# 3. Generate CSR using SHA-256
+openssl req -new -sha256 -key ${data.fileBase}.key -out ${data.fileBase}.csr -config ${configName}
+
+# 4. Verify CSR
+openssl req -in ${data.fileBase}.csr -noout -text
+
+# 5. Verify private key
+openssl pkey -in ${data.fileBase}.key -text -noout`;
+      }
+
+      return `# ECC CSR generation for Linux
+# Curve: secp384r1 (P-384)
+# Hash: SHA-256
+# Output files:
+#   - ${data.fileBase}.key
+#   - ${data.fileBase}.csr
+
+# 1. Generate ECC private key
+openssl ecparam -name secp384r1 -genkey -noout -out ${data.fileBase}.key
+
+# 2. Generate CSR using SHA-256
+openssl req -new -sha256 -key ${data.fileBase}.key -out ${data.fileBase}.csr \\
+-subj "/C=${data.country}/ST=${data.state}/L=${data.city}/O=${data.org}/OU=${data.ou}/CN=${data.cn}${data.email ? `/emailAddress=${data.email}` : ""}"
+
+# 3. Verify CSR
+openssl req -in ${data.fileBase}.csr -noout -text
+
+# 4. Verify private key
+openssl pkey -in ${data.fileBase}.key -text -noout`;
+    }
+
+    function generateWindowsGuidance(data) {
+      const configName = `openssl-${data.fileBase}.cnf`;
+
+      return `WINDOWS / IIS GUIDANCE
+
+Target algorithm:
+- ECC curve: secp384r1 (P-384)
+- Hash: SHA-256
+- Certificate family: ECDSA
+
+Important note:
+Older Windows Server builds, older IIS environments, or older cryptographic providers may not handle ECC CSR generation cleanly through the standard IIS request flow.
+
+Recommended method:
+1. Use a modern OpenSSL build on Windows.
+2. Generate the private key and CSR locally on the target server or approved admin workstation.
+3. Keep the private key under agency control.
+4. After certificate issuance, import and bind the certificate in IIS.
+
+Suggested steps using OpenSSL on Windows:
+
+# Save config file as ${configName}
+${buildOpenSSLConfig(data)}
+
+# Generate ECC private key
+openssl ecparam -name secp384r1 -genkey -noout -out ${data.fileBase}.key
+
+# Generate CSR
+openssl req -new -sha256 -key ${data.fileBase}.key -out ${data.fileBase}.csr -config ${configName}
+
+# Verify CSR
+openssl req -in ${data.fileBase}.csr -noout -text
+
+Operational reminder:
+- Do not rely on copy-paste from UI, email, PDF, or WhatsApp.
+- Use the original CSR file when submitting the request.
+- If binding fails in IIS, review OS age, cryptographic stack, and certificate algorithm support first.`;
+    }
+
+    function togglePlatformNote() {
+      const platform = document.getElementById("platform").value;
+      const note = document.getElementById("platformNote");
+
+      if (platform === "Windows") {
+        note.innerHTML = `
+          <strong>Windows guidance</strong>
+          For Windows and IIS, older OS versions or outdated cryptographic components may not expose ECC CSR generation properly. This tool will provide OpenSSL-based guidance and highlight possible compatibility issues.
+        `;
+      } else {
+        note.innerHTML = `
+          <strong>Linux guidance</strong>
+          For Linux, this tool generates an OpenSSL command using ECC P-384 with SHA-256. Private key stays on the host under agency control.
+        `;
+      }
+    }
+
+    function getStatusBadge(status) {
+      if (status === "OK") return '<span class="badge good">OK</span>';
+      if (status === "Check") return '<span class="badge warn">Check</span>';
+      return '<span class="badge unknown">Unknown</span>';
+    }
+
+    function generateResult() {
+      const cn = document.getElementById("cn").value.trim();
+      const san = document.getElementById("san").value.trim();
+      const org = document.getElementById("org").value.trim();
+      const ou = document.getElementById("ou").value.trim();
+      const city = document.getElementById("city").value.trim();
+      const state = document.getElementById("state").value.trim();
+      const country = document.getElementById("country").value.trim().toUpperCase();
+      const email = document.getElementById("email").value.trim();
+
+      const platform = document.getElementById("platform").value;
+      const webserver = document.getElementById("webserver").value;
+      const osVersion = document.getElementById("osVersion").value.trim();
+      const opensslVersion = document.getElementById("opensslVersion").value.trim();
+      const opensshVersion = document.getElementById("opensshVersion").value.trim();
+      const apacheVersion = document.getElementById("apacheVersion").value.trim();
+      const phpVersion = document.getElementById("phpVersion").value.trim();
+      const xamppVersion = document.getElementById("xamppVersion").value.trim();
+
+      if (!cn || !org || !ou || !city || !state || !country) {
+        alert("Please fill in the required certificate request details first.");
+        return;
+      }
+
+      const fileBase = normaliseFileName(cn);
+      const sanList = san
+        ? san.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const data = {
+        cn: safe(cn),
+        sanList,
+        org: safe(org),
+        ou: safe(ou),
+        city: safe(city),
+        state: safe(state),
+        country: safe(country),
+        email: safe(email),
+        fileBase
+      };
+
+      let warnings = [];
+      let checks = [];
+
+      // OpenSSL
+      if (opensslVersion) {
+        if (versionCompare(opensslVersion, "1.1.1") < 0) {
+          warnings.push("OpenSSL appears outdated. Minimum recommended version is 1.1.1 and above.");
+          checks.push(["OpenSSL", opensslVersion, "Minimum 1.1.1", "Check"]);
+        } else {
+          checks.push(["OpenSSL", opensslVersion, "Minimum 1.1.1", "OK"]);
+        }
+      } else {
+        checks.push(["OpenSSL", "Not provided", "Minimum 1.1.1", "Unknown"]);
+      }
+
+      // OpenSSH
+      if (opensshVersion) {
+        if (versionCompare(opensshVersion, "1.1.1") < 0) {
+          warnings.push("OpenSSH appears outdated based on the current internal knowledge bank rule. Minimum baseline used here is 1.1.1 and above.");
+          checks.push(["OpenSSH", opensshVersion, "Minimum 1.1.1", "Check"]);
+        } else {
+          checks.push(["OpenSSH", opensshVersion, "Minimum 1.1.1", "OK"]);
+        }
+      } else {
+        checks.push(["OpenSSH", "Not provided", "Minimum 1.1.1", "Unknown"]);
+      }
+
+      // Windows OS
+      if (platform === "Windows") {
+        const winYear = extractWindowsYear(osVersion);
+        if (winYear !== null) {
+          if (winYear < 2012) {
+            warnings.push("Windows Server version appears outdated. Minimum recommended version is Windows Server 2012 and above.");
+            checks.push(["Windows Server", osVersion, "Minimum 2012", "Check"]);
+          } else {
+            checks.push(["Windows Server", osVersion, "Minimum 2012", "OK"]);
+          }
+        } else {
+          checks.push(["Windows Server", osVersion || "Not provided", "Minimum 2012", "Unknown"]);
+        }
+      }
+
+      // Linux OS
+      if (platform === "Linux") {
+        const centosMajor = extractCentOSMajor(osVersion);
+        if (/centos/i.test(osVersion)) {
+          if (centosMajor !== null && centosMajor < 7) {
+            warnings.push("Linux OS appears outdated. Minimum recommended baseline is CentOS 7 and above.");
+            checks.push(["Linux OS", osVersion, "Minimum CentOS 7", "Check"]);
+          } else {
+            checks.push(["Linux OS", osVersion || "Not provided", "Minimum CentOS 7", "OK"]);
+          }
+        } else {
+          checks.push(["Linux OS", osVersion || "Not provided", "Minimum CentOS 7", "Unknown"]);
+        }
+      }
+
+      // Apache
+      if (apacheVersion) {
+        if (versionCompare(apacheVersion, "2.4.54") < 0) {
+          warnings.push("Apache appears outdated. Minimum recommended version is 2.4.54 and above.");
+          checks.push(["Apache", apacheVersion, "Minimum 2.4.54", "Check"]);
+        } else {
+          checks.push(["Apache", apacheVersion, "Minimum 2.4.54", "OK"]);
+        }
+      } else {
+        checks.push(["Apache", "Not provided", "Minimum 2.4.54", "Unknown"]);
+      }
+
+      // PHP
+      if (phpVersion) {
+        if (versionCompare(phpVersion, "7.4.33") < 0) {
+          warnings.push("PHP appears outdated. Minimum recommended version is 7.4.33 and above.");
+          checks.push(["PHP", phpVersion, "Minimum 7.4.33", "Check"]);
+        } else {
+          checks.push(["PHP", phpVersion, "Minimum 7.4.33", "OK"]);
+        }
+      } else {
+        checks.push(["PHP", "Not provided", "Minimum 7.4.33", "Unknown"]);
+      }
+
+      // XAMPP
+      if (xamppVersion) {
+        if (versionCompare(xamppVersion, "7.4.33") < 0) {
+          warnings.push("XAMPP appears outdated. Minimum recommended version is 7.4.33 and above.");
+          checks.push(["XAMPP", xamppVersion, "Minimum 7.4.33", "Check"]);
+        } else {
+          checks.push(["XAMPP", xamppVersion, "Minimum 7.4.33", "OK"]);
+        }
+      } else {
+        checks.push(["XAMPP", "Not provided", "Minimum 7.4.33", "Unknown"]);
+      }
+
+      // Stack-specific reminder
+      if (platform === "Windows" && webserver === "IIS") {
+        warnings.push("Older IIS and Windows cryptographic stack may not handle ECC CSR generation or binding cleanly.");
+      }
+
+      if (webserver === "XAMPP") {
+        warnings.push("XAMPP environments often hide outdated bundled components. Check Apache, PHP, and OpenSSL together.");
+      }
+
+      // Always remind about copy-paste
+      warnings.push("Do not copy-paste CSR content from UI, email, PDF, or WhatsApp. Submit the original CSR file only.");
+
+      // Generate output
+      const output = platform === "Linux"
+        ? generateLinuxScript(data)
+        : generateWindowsGuidance(data);
+
+      document.getElementById("output").value = output;
+
+      // Render result area
+      let html = "";
+
+      if (warnings.length > 1) {
+        html += `
+          <div class="panel warning">
+            <strong>Compatibility and implementation risks detected</strong>
+            <ul>
+              ${warnings.map(item => `<li>${item}</li>`).join("")}
+            </ul>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="panel ok">
+            <strong>No major issue detected from the submitted version details</strong>
+            Continue with care and validate certificate import and binding on the actual target server.
+          </div>
+        `;
+      }
+
+      html += `
+        <div class="panel info">
+          <strong>Operational reminder</strong>
+          Generate the private key and CSR directly on the target host or an approved admin workstation. Keep the private key under agency control and store the original CSR file safely.
+        </div>
+      `;
+
+      html += `
+        <div class="section-title">6. Compatibility Check Summary</div>
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Detected Value</th>
+              <th>Baseline</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${checks.map(row => `
+              <tr>
+                <td>${row[0]}</td>
+                <td>${row[1]}</td>
+                <td>${row[2]}</td>
+                <td>${getStatusBadge(row[3])}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+
+      document.getElementById("resultArea").innerHTML = html;
+    }
+
+    function copyOutput() {
+      const output = document.getElementById("output");
+      if (!output.value.trim()) {
+        alert("There is no generated output to copy yet.");
+        return;
+      }
+
+      output.select();
+      output.setSelectionRange(0, 99999);
+
+      try {
+        document.execCommand("copy");
+        alert("Output copied.");
+      } catch (e) {
+        alert("Copy failed. Please copy manually.");
+      }
+    }
+
+    function resetForm() {
+      document.getElementById("cn").value = "";
+      document.getElementById("san").value = "";
+      document.getElementById("org").value = "";
+      document.getElementById("ou").value = "";
+      document.getElementById("city").value = "";
+      document.getElementById("state").value = "";
+      document.getElementById("country").value = "";
+      document.getElementById("email").value = "";
+      document.getElementById("platform").value = "Linux";
+      document.getElementById("webserver").value = "Apache";
+      document.getElementById("osVersion").value = "";
+      document.getElementById("opensslVersion").value = "";
+      document.getElementById("opensshVersion").value = "";
+      document.getElementById("apacheVersion").value = "";
+      document.getElementById("phpVersion").value = "";
+      document.getElementById("xamppVersion").value = "";
+      document.getElementById("output").value = "";
+      document.getElementById("resultArea").innerHTML = "";
+      togglePlatformNote();
+    }
+
+    togglePlatformNote();
+  </script>
+</body>
+</html>
